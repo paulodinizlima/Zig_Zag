@@ -9,9 +9,14 @@ public class GemScript : MonoBehaviour
 
 	private void OnTriggerEnter(Collider other)
 	{
-		if(other.tag == "Ball") {
+		if(other.CompareTag("Ball")) {
 			Instantiate(sparkleFX, transform.position, Quaternion.identity);
-			GameplayController.instance.PlayCollectableSound();
+			if (GameplayController.instance != null) {
+				GameplayController.instance.PlayCollectableSound();
+			}
+			if (ScoreManager.instance != null) {
+				ScoreManager.instance.AddGem();
+			}
 			gameObject.SetActive(false);
 		}
 	}

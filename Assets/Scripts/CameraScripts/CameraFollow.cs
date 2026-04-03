@@ -4,24 +4,36 @@ using UnityEngine;
 
 public class CameraFollow : MonoBehaviour
 {
-    private Transform ballTarget;
-    private Vector3 oldPosition;
+    [Header("Target")]
+    [SerializeField] private Transform ballTarget;
 
-	private void Awake()
+    [Header("Follow Settings")]
+    [SerializeField] private Vector3 offset = new Vector3(6f, 8f, -6f);
+    [SerializeField] private float followSpeed = 8f;
+
+	private void Start()
 	{
-		ballTarget = GameObject.FindGameObjectWithTag("Ball").transform;
-		oldPosition = ballTarget.position;
+		if(ballTarget == null) {
+			GameObject ball = GameObject.FindGameObjectWithTag("Ball");
+
+			if(ball != null) {
+				ballTarget = ball.transform;
+			}
+		}
 	}
 
-	private void FixedUpdate()
+	private void LateUpdate()
 	{
-		if (ballTarget) {
-			Vector3 newPosition = ballTarget.position;
-			Vector3 delta = oldPosition - newPosition;
-			delta.y = 0f;
-			transform.position = transform.position - delta;
-			oldPosition = newPosition;
-		}
+		if (ballTarget == null)
+			return;
+
+		Vector3 desiredPosition = ballTarget.position + offset;
+
+		transform.position = Vector3.Lerp(
+			transform.position,
+			desiredPosition,
+			followSpeed * Time.deltaTime
+		);
 	}
 
 

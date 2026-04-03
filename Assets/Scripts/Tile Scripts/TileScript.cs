@@ -30,7 +30,10 @@ public class TileScript : MonoBehaviour
 
 	void OnTriggerExit(Collider other)
 	{
-		if (other.tag == "Ball") {
+		if (other.CompareTag("Ball")) {
+			if (ScoreManager.instance != null) {
+				ScoreManager.instance.AddTilePoint();
+			}
 			StartCoroutine(TriggerFallingDown());
 		}
 	}
