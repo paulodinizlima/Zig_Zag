@@ -110,6 +110,27 @@ public class GameplayController : MonoBehaviour
 		}
 	}
 
+	//Inicia oficialmente o gameplay
+	public void StartGameplay()
+	{
+		//Evita iniciar duas vezes
+		if (gamePlaying) {
+			return;
+		}
+		//Garante que o tempo está rodando(importante após GameOver)
+		Time.timeScale = 1f;
+		//Ativa o gameplay
+		gamePlaying = true;
+
+		//Ativa o spawn contínuo de tiles
+		ActiveTileSpawner();
+
+		//Se existir ScoreManager, reseta a run atual
+		if (ScoreManager.instance != null) {
+			ScoreManager.instance.ResetRun();
+		}
+	}
+
 	private void Update()
 	{
 		//Atualiza o ciclo visual (dia/noite)

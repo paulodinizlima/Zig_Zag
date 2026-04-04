@@ -115,6 +115,9 @@ public class ScoreManager : MonoBehaviour
 		//Se a bola não estiver disponível, mostra o nível inicial
 		if (ballScript == null) {
 			speedText.text = "Level: 1";
+			scoreText.text = "Score: 0";
+			//bestScoreText.text = "Best: 0";
+			gemsText.text = "Gems: 0";
 			return;
 		}
 		//Mostra o nível calculado com base na velocidade atual da bola
