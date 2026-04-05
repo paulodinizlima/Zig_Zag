@@ -46,9 +46,9 @@ public class BallScript : MonoBehaviour
 	//Controla a coroutine atual para não empilhar várias
 	private Coroutine turnImpactRoutine;
 
-	[Header("Grid Correction")]
+	//[Header("Grid Correction")]
 	//Tamanho da grade usada para alinhar a bola nos eixos
-	[SerializeField] private float gridSize = 1f;
+	//[SerializeField] private float gridSize = 1f;
 
 
 
@@ -148,7 +148,7 @@ public class BallScript : MonoBehaviour
 		isMovingLeft = !isMovingLeft;
 		currentDirection = isMovingLeft ? leftDirection : forwardDirection;
 		//Corrige a posiçao da bola na grade para evitar drift diagonal
-		SnapToGridAfterTurn();
+		//SnapToGridAfterTurn();
 		//Toca o efeito visual de impacto ao virar
 		PlayTurnImpact();
 	}
@@ -215,7 +215,7 @@ public class BallScript : MonoBehaviour
 	}
 
 	//Alinha a bola na grade para evitar desvio diagonal
-	private void SnapToGridAfterTurn()
+	/*private void SnapToGridAfterTurn()
 	{
 		Vector3 pos = transform.position;
 		//Se estiver andando para a esquerda/direita, corrige o eixo Z
@@ -227,7 +227,8 @@ public class BallScript : MonoBehaviour
 			pos.x = Mathf.Round(pos.x / gridSize) * gridSize;
 		}
 		transform.position = pos;
-	}
+
+	}*/
 
 	private void CheckBallOutOfBounds()
 	{

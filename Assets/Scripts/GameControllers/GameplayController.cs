@@ -253,6 +253,11 @@ public class GameplayController : MonoBehaviour
 
 		//Instancia o tile
 		Instantiate(tilePrefab, currentTilePosition, Quaternion.identity);
+
+		//Tenta criar uma decoração perto do tile recém-criado
+		if (DecorSpawner.instance != null) {
+			DecorSpawner.instance.TrySpawnDecorNear(currentTilePosition);
+		}
 	}
 
 	public void ActiveTileSpawner()
@@ -269,8 +274,8 @@ public class GameplayController : MonoBehaviour
 		while (gamePlaying) {
 			//Espera um tempo que varia de acordo com a velocidade da bola
 			yield return new WaitForSeconds(GetCurrentTileSpawnDelay());
-			Debug.Log(GetCurrentTileSpawnDelay());
-			Debug.Log(ballScript.CurrentSpeed);
+			//Debug.Log(GetCurrentTileSpawnDelay());
+			//Debug.Log(ballScript.CurrentSpeed);
 			//Cria mais um tile
 			CreateTile();
 		}
@@ -332,13 +337,13 @@ public class GameplayController : MonoBehaviour
 		}
 		
 		if (visualDirection == 1) {
-			Debug.Log("entrou noite");
+			//Debug.Log("entrou noite");
 			//Dia -> Noite
 			mainCamera.backgroundColor = Color.Lerp(originalCameraColor, Color.black, percent);
 			tileMat.color = Color.Lerp(dayTileColors[tileColorIndex], nightTileColor * 2f, percent);
 			dayLight.intensity = 1f - percent;
 		} else {
-			Debug.Log("entrou dia");
+			//Debug.Log("entrou dia");
 			//Noite -> Dia
 			mainCamera.backgroundColor = Color.Lerp(Color.black, originalCameraColor, percent);
 			tileMat.color = Color.Lerp(nightTileColor, dayTileColors[tileColorIndex], percent);
