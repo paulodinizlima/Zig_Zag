@@ -50,8 +50,6 @@ public class BallScript : MonoBehaviour
 	//Tamanho da grade usada para alinhar a bola nos eixos
 	//[SerializeField] private float gridSize = 1f;
 
-
-
 	//Retorna a velocidade atual da bola
 	public float CurrentSpeed => currentSpeed;
 

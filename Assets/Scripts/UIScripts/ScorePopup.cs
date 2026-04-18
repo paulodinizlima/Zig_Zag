@@ -4,7 +4,6 @@ using TMPro;
 
 public class ScorePopup : MonoBehaviour
 {
-
 	[SerializeField] private TextMeshProUGUI popupText;
 	[SerializeField] private float lifetime = 0.8f;
 	[SerializeField] private float moveDistance = 40f;

@@ -5,7 +5,6 @@ using TMPro;
 
 public class GameOverUI : MonoBehaviour
 {
-
 	public static GameOverUI instance;
 
 	[Header("Panel")]

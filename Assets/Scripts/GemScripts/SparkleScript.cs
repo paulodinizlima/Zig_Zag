@@ -8,7 +8,6 @@ public class SparkleScript : MonoBehaviour
     {
         StartCoroutine(DeactiveAfterTime());
     }
-
     IEnumerator DeactiveAfterTime()
 	{
         yield return new WaitForSeconds(1.5f);

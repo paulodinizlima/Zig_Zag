@@ -49,7 +49,6 @@ public class DecorSpawner : MonoBehaviour
 		}
 		instance = this;
 	}
-
 	//Tenta gerar um prop decorativo perto da posição de um tile
 	public void TrySpawnDecorNear(Vector3 tilePosition)
 	{

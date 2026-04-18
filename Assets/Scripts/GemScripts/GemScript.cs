@@ -20,5 +20,4 @@ public class GemScript : MonoBehaviour
 			gameObject.SetActive(false);
 		}
 	}
-
 } //class

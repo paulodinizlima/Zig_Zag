@@ -13,5 +13,4 @@ public class GemRotate : MonoBehaviour
 		angle = (angle + speed) % 360f;
 		transform.localRotation = Quaternion.Euler(new Vector3(45f, angle, 0f));
 	}
-
 } //class

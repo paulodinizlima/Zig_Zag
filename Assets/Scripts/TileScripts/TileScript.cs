@@ -20,6 +20,13 @@ public class TileScript : MonoBehaviour
 	[SerializeField] private float coinHeight = 1f;
 	[SerializeField] private float adjacentOffset = 1.2f;
 
+	[Header("Rare Pickup")]
+	[SerializeField] private GameObject magnetPickupPrefab;
+	[SerializeField] private float chanceForMagnetPickup = 0.03f;
+	[SerializeField] private float magnetPickupHeight = 1.2f;
+
+	private Vector3 tilePathDirection = Vector3.zero;
+
 	private void Awake()
 	{
 		myBody = GetComponent<Rigidbody>();
@@ -29,6 +36,12 @@ public class TileScript : MonoBehaviour
 	{
 		SpawnGem();
 		SpawnCoins();
+		SpawnRarePickup();
+	}
+
+	public void SetTilePathDirection(Vector3 direction)
+	{
+		tilePathDirection = direction.normalized;
 	}
 
 	private void SpawnGem()
@@ -54,7 +67,7 @@ public class TileScript : MonoBehaviour
 
 		//moeda adjacente (fora do caminho)
 		if (Random.value < chanceForAdjacentCoin) {
-			Vector3 side = GetSideDirection();
+			Vector3 side = GetSafeAdjacentDirection();
 			Vector3 pos = transform.position + side * adjacentOffset;
 			pos.y += coinHeight;
 			SpawnCoin(pos, Coin.CoinType.AdjacentOnly);
@@ -74,10 +87,35 @@ public class TileScript : MonoBehaviour
 		}
 	}
 
-	private Vector3 GetSideDirection()
+	private void SpawnRarePickup()
 	{
-		//Zig-zag simples: lateral global
-		return (Random.value < 0.5f) ? Vector3.right : Vector3.left;
+		if (magnetPickupPrefab == null) {
+			return;
+		}
+
+		if (Random.value < chanceForMagnetPickup) {
+			Vector3 pos = transform.position;
+			pos.y += magnetPickupHeight;
+			Instantiate(magnetPickupPrefab, pos, Quaternion.identity);
+		}
+	}
+
+	private Vector3 GetSafeAdjacentDirection()
+	{
+		//Se o tile foi criado indo para a esquerda,
+		//a moeda adjacente deve ir para trás no Z.
+		if (tilePathDirection == Vector3.left) {
+			return Vector3.back;
+		}
+
+		//Se o tile foi criado indo para frente,
+		//a moeda adjacente deve ir para a direita no X.
+		if (tilePathDirection == Vector3.forward) {
+			return Vector3.right;
+		}
+
+		//fallback seguro
+		return Vector3.right;
 	}
 
 	void OnTriggerExit(Collider other)

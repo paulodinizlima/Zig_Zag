@@ -236,6 +236,7 @@ public class GameplayController : MonoBehaviour
 	{
 		//Copia a posição atual
 		Vector3 newTilePosition = currentTilePosition;
+		Vector3 tileDirection;
 
 		//Decide aleatoriamente a direção
 		int rand = Random.Range(0, 100);
@@ -243,16 +244,23 @@ public class GameplayController : MonoBehaviour
 		if (rand < 50) {
 			//Move para a esquerda (eixo X)
 			newTilePosition.x -= 1f;
+			tileDirection = Vector3.left;
 		} else {
 			//Move para a frente (eixo Z)
 			newTilePosition.z += 1f;
+			tileDirection = Vector3.forward;
 		}
 
 		//Atualiza posição atual
 		currentTilePosition = newTilePosition;
 
 		//Instancia o tile
-		Instantiate(tilePrefab, currentTilePosition, Quaternion.identity);
+		GameObject newTile = Instantiate(tilePrefab, currentTilePosition, Quaternion.identity);
+
+		TileScript tileScript = newTile.GetComponent<TileScript>();
+		if (tileScript != null) {
+			tileScript.SetTilePathDirection(tileDirection);
+		}
 
 		//Tenta criar uma decoração perto do tile recém-criado
 		if (DecorSpawner.instance != null) {

@@ -31,7 +31,6 @@ public class StartUI : MonoBehaviour
 		}
 		instance = this;
 	}
-
 	private void Start()
 	{
 		//Garante que o painel inicial esteja visível ao abrir a cena

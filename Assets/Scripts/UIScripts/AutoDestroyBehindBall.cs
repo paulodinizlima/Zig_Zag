@@ -1,5 +1,4 @@
 using UnityEngine;
-
 public class AutoDestroyBehindBall : MonoBehaviour
 {
 	[Header("Destroy Settings")]
