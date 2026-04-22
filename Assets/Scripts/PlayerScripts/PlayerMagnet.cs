@@ -1,7 +1,11 @@
+using System;
 using UnityEngine;
 
 public class PlayerMagnet : MonoBehaviour
 {
+	//Evento global para HUD e feedback visual reagirem ao estado do magnet
+	public static event Action<bool> MagnetStateChanged;
+
 	[SerializeField] private bool isMagnetActive = false;
 	[SerializeField] private float timer = 0f;
 
@@ -28,19 +32,30 @@ public class PlayerMagnet : MonoBehaviour
 			return;
 		}
 
+		bool wasInactive = !isMagnetActive;
+
 		isMagnetActive = true;
 
 		//Se pegar outro magnet enquanto um já estiver ativo, 
 		//mantém o maior tempo entre o atual e o novo
 		timer = Mathf.Max(timer, duration);
-		
-		Debug.Log("Magnet ativado por " + duration + " segundos");
+
+		//Só dispara o evento quando o estado realmente muda para ativo
+		if (wasInactive) {
+			MagnetStateChanged?.Invoke(true);
+		}
 	}
 
 	public void DeactivateMagnet()
 	{
+		if (!isMagnetActive) {
+			return;
+		}
+
 		isMagnetActive = false;
 		timer = 0f;
-		Debug.Log("Magnet desativado");
+
+		//Dispara o evneto para HUD e feedback visual
+		MagnetStateChanged?.Invoke(false);
 	}
 }

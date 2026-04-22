@@ -3,7 +3,7 @@ using UnityEngine;
 public class BallScript : MonoBehaviour
 {
 	[Header("Movement")]
-	//[SerializeField] private float speed = 3.5f;
+	[SerializeField] private float speed = 3.5f;
 
 	[Header("Speed Progression")]
 	// Velocidade inicial da bola
@@ -46,6 +46,23 @@ public class BallScript : MonoBehaviour
 	//Controla a coroutine atual para não empilhar várias
 	private Coroutine turnImpactRoutine;
 
+	[Header("Magnet Visual Feedback")]
+	//Multiplicador aplicado ao emissive original quando o magnet estiver ativo
+	[SerializeField] private float magnetEmissionMultiplier = 2.0f;
+	//Cor adicional de energia para o magnet
+	[SerializeField] private Color magnetEmissionTint = new Color(0.25f, 0.85f, 1.0f);
+	//Velocidade da transição visual do magnet
+	[SerializeField] private float magnetVisualLerpSpeed = 10f;
+
+	//Controle interno do material da bola
+	private Renderer ballRenderer;
+	private Material runtimeBallMaterial;
+	private bool hasEmissionProperty = false;
+	private Color originalEmissionColor = Color.black;
+	private Color targetEmissionColor = Color.black;
+	private Color currentEmissionColor = Color.black;
+	private bool magnetVisualActive = false;
+
 	//[Header("Grid Correction")]
 	//Tamanho da grade usada para alinhar a bola nos eixos
 	//[SerializeField] private float gridSize = 1f;
@@ -55,6 +72,16 @@ public class BallScript : MonoBehaviour
 
 	private bool isMovingLeft = true;
 	private Vector3 currentDirection;
+
+	private void OnEnable()
+	{
+		PlayerMagnet.MagnetStateChanged += HandleMagnetStateChanged;		
+	}
+
+	private void OnDisable()
+	{
+		PlayerMagnet.MagnetStateChanged -= HandleMagnetStateChanged;	
+	}
 
 	private void Awake()
 	{
@@ -69,20 +96,37 @@ public class BallScript : MonoBehaviour
 		if (ballVisual != null) {
 			originalVisualScale = ballVisual.localScale;
 		}
+
+		SetupBallMaterial();
+	}
+
+	private void Start()
+	{
+		//Sincroniza o visual inicial com o estado atual do magnet, caso necessário
+		PlayerMagnet playerMagnet = GetComponent<PlayerMagnet>();
+		if (playerMagnet != null) {
+			ApplyMagnetVisualState(playerMagnet.IsMagnetActive, true);
+		}
 	}
 
 	private void Update()
 	{
 		HandleInput();
 		CheckBallOutOfBounds();
+
 		//Atualiza a progressão da velocidade da bola
 		UpdateSpeed();
+
+		//Atualiza a transição suave do emissive do magnet
+		UpdateMagnetVisual();
 	}
 
 	private void FixedUpdate()
 	{
-		if (!GameplayController.instance.gamePlaying)
+		if (!GameplayController.instance.gamePlaying) {
 			return;
+		}
+
 		MoveBall();
 		RotateVisual();
 	}
@@ -102,8 +146,10 @@ public class BallScript : MonoBehaviour
 		if (!GameplayController.instance.gamePlaying) {
 			return;
 		}
+
 		//Aumenta a velocidade continuamente
 		currentSpeed += speedIncreasePerSecond * Time.deltaTime;
+
 		//Limita a velocidade entre a inicial e a máxima
 		currentSpeed = Mathf.Clamp(currentSpeed, startSpeed, maxSpeed);
 	}
@@ -145,8 +191,10 @@ public class BallScript : MonoBehaviour
 		//Alterna a direção
 		isMovingLeft = !isMovingLeft;
 		currentDirection = isMovingLeft ? leftDirection : forwardDirection;
+
 		//Corrige a posiçao da bola na grade para evitar drift diagonal
 		//SnapToGridAfterTurn();
+
 		//Toca o efeito visual de impacto ao virar
 		PlayTurnImpact();
 	}
@@ -206,10 +254,93 @@ public class BallScript : MonoBehaviour
 			ballVisual.localScale = Vector3.Lerp(impactScale, originalVisualScale, t);
 			yield return null;
 		}
+
 		//Garante que terminou exatamente na escala original
 		ballVisual.localScale = originalVisualScale;
 
 		turnImpactRoutine = null;
+	}
+
+	private void SetupBallMaterial()
+	{
+		//Tenta pegar o Renderer do visual principal
+		if (ballVisual != null) {
+			ballRenderer = ballVisual.GetComponent<Renderer>();
+			if (ballRenderer == null) {
+				ballRenderer = ballVisual.GetComponentInChildren<Renderer>();
+			}
+		}
+
+		//Fallback: tenta qualquer Renderer filho
+		if (ballRenderer == null) {
+			ballRenderer = GetComponentInChildren<Renderer>();
+		}
+
+		if (ballRenderer == null || ballRenderer.material == null) {
+			return;
+		}
+
+		//Instancia uma cópia do material para não alterar o material compartilhado do projeto
+		runtimeBallMaterial = ballRenderer.material;
+		hasEmissionProperty = runtimeBallMaterial.HasProperty("_EmissionColor");
+
+		if (!hasEmissionProperty) {
+			return;
+		}
+
+		runtimeBallMaterial.EnableKeyword("_EMISSION");
+
+		originalEmissionColor = runtimeBallMaterial.GetColor("_EmissionColor");
+		currentEmissionColor = originalEmissionColor;
+		targetEmissionColor = originalEmissionColor;
+
+		ApplyEmissionColor(currentEmissionColor);
+	}
+
+	private void HandleMagnetStateChanged(bool isActive)
+	{
+		ApplyMagnetVisualState(isActive, false);
+	}
+
+	private void ApplyMagnetVisualState(bool isActive, bool instant)
+	{
+		magnetVisualActive = isActive;
+
+		if (!hasEmissionProperty || runtimeBallMaterial == null) {
+			return;
+		}
+
+		if (isActive) {
+			//Combina a emissão original com um reforço visual em tom ciano
+			targetEmissionColor = (originalEmissionColor + magnetEmissionTint) * magnetEmissionMultiplier;
+		} else {
+			targetEmissionColor = originalEmissionColor;
+		}
+
+		if (instant) {
+			currentEmissionColor = targetEmissionColor;
+			ApplyEmissionColor(currentEmissionColor);
+		}
+	}
+
+	private void UpdateMagnetVisual()
+	{
+		if (!hasEmissionProperty || runtimeBallMaterial == null) {
+			return;
+		}
+
+		currentEmissionColor = Color.Lerp(currentEmissionColor, targetEmissionColor, magnetVisualLerpSpeed * Time.deltaTime);
+
+		ApplyEmissionColor(currentEmissionColor);
+	}
+
+	private void ApplyEmissionColor(Color emissionColor)
+	{
+		if (!hasEmissionProperty || runtimeBallMaterial == null) {
+			return;
+		}
+
+		runtimeBallMaterial.SetColor("_EmissionColor", emissionColor);
 	}
 
 	//Alinha a bola na grade para evitar desvio diagonal
@@ -232,13 +363,16 @@ public class BallScript : MonoBehaviour
 	{
 		if (!GameplayController.instance.gamePlaying)
 			return;
+
 		if(transform.position.y < destroyY) {
 			GameplayController.instance.gamePlaying = false;
+
 			if (ScoreManager.instance != null) {
 				ScoreManager.instance.ResetCombo();
 				ScoreManager.instance.GameOver();
 			}
-			Destroy(gameObject);
+
+			//Destroy(gameObject);
 		}
 	}
 

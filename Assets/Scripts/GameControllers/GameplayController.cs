@@ -1,6 +1,5 @@
 using System.Collections;
 using UnityEngine;
-
 public class GameplayController : MonoBehaviour
 {
 	//Instância global (singleton)
@@ -13,6 +12,10 @@ public class GameplayController : MonoBehaviour
 	[Header("Tile Spawn")]
 	//Prefab do tile que será instanciado
 	[SerializeField] private GameObject tilePrefab;
+
+	//Variantes opcionais de tile
+	//Se preenchido, o jogo escolhe aleatoriamente uma delas
+	[SerializeField] private GameObject[] tileVariants;
 
 	//Quantidade inicial de tiles ao iniciar a cena
 	[SerializeField] private int initialTileCount = 20;
@@ -254,18 +257,54 @@ public class GameplayController : MonoBehaviour
 		//Atualiza posição atual
 		currentTilePosition = newTilePosition;
 
-		//Instancia o tile
-		GameObject newTile = Instantiate(tilePrefab, currentTilePosition, Quaternion.identity);
+		//Escolhe qual prefab de tile será usado
+		GameObject prefabToSpawn = GetRandomTilePrefab();
 
+		if (prefabToSpawn == null) {
+			Debug.LogWarning("Nenhum prefab de tile configurado no GameplayController");
+			return;
+		}
+
+		//Instancia o tile
+		GameObject newTile = Instantiate(prefabToSpawn, currentTilePosition, Quaternion.identity);
+
+		//Define a direção do caminho no TileScript
 		TileScript tileScript = newTile.GetComponent<TileScript>();
 		if (tileScript != null) {
 			tileScript.SetTilePathDirection(tileDirection);
+		} else {
+			Debug.LogWarning("O tile instanciado não possui TileScript: " + newTile.name);
 		}
 
 		//Tenta criar uma decoração perto do tile recém-criado
 		if (DecorSpawner.instance != null) {
 			DecorSpawner.instance.TrySpawnDecorNear(currentTilePosition);
 		}
+	}
+
+	//Escolhe aleatoriamente uma variante de tile
+	//Se não houver variantes configuradas, usa o tilePrefab padrão.
+	private GameObject GetRandomTilePrefab()
+	{
+		//Se existe array de variantes preenchido, tenta escolher uma válida
+		if (tileVariants != null && tileVariants.Length > 0) {
+			int safety = 0;
+
+			//Tenta encontrar uma variante não nula
+			while (safety < 10) {
+				int index = Random.Range(0, tileVariants.Length);
+				GameObject candidate = tileVariants[index];
+
+				if (candidate != null) {
+					return candidate;
+				}
+
+				safety++;
+			}
+		}
+
+		//Fallback para prefab padrão
+		return tilePrefab;
 	}
 
 	public void ActiveTileSpawner()
@@ -282,8 +321,7 @@ public class GameplayController : MonoBehaviour
 		while (gamePlaying) {
 			//Espera um tempo que varia de acordo com a velocidade da bola
 			yield return new WaitForSeconds(GetCurrentTileSpawnDelay());
-			//Debug.Log(GetCurrentTileSpawnDelay());
-			//Debug.Log(ballScript.CurrentSpeed);
+
 			//Cria mais um tile
 			CreateTile();
 		}
@@ -345,13 +383,11 @@ public class GameplayController : MonoBehaviour
 		}
 		
 		if (visualDirection == 1) {
-			//Debug.Log("entrou noite");
 			//Dia -> Noite
 			mainCamera.backgroundColor = Color.Lerp(originalCameraColor, Color.black, percent);
 			tileMat.color = Color.Lerp(dayTileColors[tileColorIndex], nightTileColor * 2f, percent);
 			dayLight.intensity = 1f - percent;
 		} else {
-			//Debug.Log("entrou dia");
 			//Noite -> Dia
 			mainCamera.backgroundColor = Color.Lerp(Color.black, originalCameraColor, percent);
 			tileMat.color = Color.Lerp(nightTileColor, dayTileColors[tileColorIndex], percent);

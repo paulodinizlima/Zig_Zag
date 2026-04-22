@@ -20,10 +20,15 @@ public class TileScript : MonoBehaviour
 	[SerializeField] private float coinHeight = 1f;
 	[SerializeField] private float adjacentOffset = 1.2f;
 
-	[Header("Rare Pickup")]
+	[Header("Rare Pickup - Magnet")]
 	[SerializeField] private GameObject magnetPickupPrefab;
 	[SerializeField] private float chanceForMagnetPickup = 0.03f;
 	[SerializeField] private float magnetPickupHeight = 1.2f;
+
+	[Header("Rare Pickup - Tile Light Energy")]
+	[SerializeField] private GameObject lightEnergyPickupPrefab;
+	[SerializeField] private float chanceForLightEnergyPickup = 0.03f;
+	[SerializeField] private float lightEnergyPickupHeight = 1.2f;
 
 	private Vector3 tilePathDirection = Vector3.zero;
 
@@ -48,7 +53,7 @@ public class TileScript : MonoBehaviour
 	{
 		if (gem != null && Random.value < chanceForCollectable) {
 			Vector3 temp = transform.position;
-			temp.y += 1.5f;
+			temp.y += 1.0f;
 			Instantiate(gem, temp, Quaternion.identity);
 		}
 	}
@@ -89,15 +94,46 @@ public class TileScript : MonoBehaviour
 
 	private void SpawnRarePickup()
 	{
-		if (magnetPickupPrefab == null) {
+		//Se nenhum pickup raro estiver configurado, não faz nada
+		bool hasMagnetPickup = magnetPickupPrefab != null;
+		bool hasLightEnergyPickup = lightEnergyPickupPrefab != null;
+
+		if (!hasMagnetPickup && !hasLightEnergyPickup) {
 			return;
 		}
 
-		if (Random.value < chanceForMagnetPickup) {
+		//Primeiro decide se o tile vai ter pickup raro algum.
+		//Como agora temos dois pickups raros, usamos a maior das chances
+		//como "porta de entrada" para não criar overlap de itens no mesmo tile
+		float rarePickupGateChance = Mathf.Max(chanceForMagnetPickup, chanceForLightEnergyPickup);
+
+		if (Random.value >= rarePickupGateChance) {
+			return;
+		}
+
+		//Monta um sorteio ponderado entre os pickups raros disponíveis
+		float magnetWeight = hasMagnetPickup ? chanceForMagnetPickup : 0f;
+		float lightEnergyWeight = hasLightEnergyPickup ? chanceForLightEnergyPickup : 0f;
+		float totalWeight = magnetWeight + lightEnergyWeight;
+
+		if (totalWeight <= 0f) {
+			return;
+		}
+
+		float roll = Random.value * totalWeight;
+
+		//Magnet
+		if (roll < magnetWeight) {
 			Vector3 pos = transform.position;
 			pos.y += magnetPickupHeight;
 			Instantiate(magnetPickupPrefab, pos, Quaternion.identity);
+			return;
 		}
+
+		// Light Energy
+		Vector3 lightPos = transform.position;
+		lightPos.y += lightEnergyPickupHeight;
+		Instantiate(lightEnergyPickupPrefab, lightPos, Quaternion.identity);
 	}
 
 	private Vector3 GetSafeAdjacentDirection()
@@ -127,6 +163,7 @@ public class TileScript : MonoBehaviour
 			StartCoroutine(TriggerFallingDown());
 		}
 	}
+
 	IEnumerator TriggerFallingDown()
 	{
 		yield return new WaitForSeconds(0.3f);
