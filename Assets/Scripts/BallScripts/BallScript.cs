@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.EventSystems;
 
 public class BallScript : MonoBehaviour
 {
@@ -118,17 +119,25 @@ public class BallScript : MonoBehaviour
 		UpdateSpeed();
 
 		//Atualiza a transição suave do emissive do magnet
-		UpdateMagnetVisual();
-	}
+		//UpdateMagnetVisual();
 
-	private void FixedUpdate()
-	{
 		if (!GameplayController.instance.gamePlaying) {
 			return;
 		}
 
 		MoveBall();
 		RotateVisual();
+
+	}
+
+	private void FixedUpdate()
+	{
+		/*if (!GameplayController.instance.gamePlaying) {
+			return;
+		}
+
+		MoveBall();
+		RotateVisual();*/
 	}
 	
 	//Converte a velocidade atual em um nível visual
@@ -156,22 +165,48 @@ public class BallScript : MonoBehaviour
 
 	private void HandleInput()
 	{
-		if (!TurnInputPressed()) {
-			return;
-		}
-
-		//Só permite virar se o jogo já estiver em andamento
 		if (!GameplayController.instance.gamePlaying) {
 			return;
 		}
 
-		if (Input.GetMouseButtonDown(0) ||
+		// TOUCH MOBILE - prioridade máxima
+		if (Input.touchCount > 0) {
+			Touch touch = Input.GetTouch(0);
+
+			if (touch.phase == TouchPhase.Began) {
+				if (
+					EventSystem.current != null &&
+					EventSystem.current.IsPointerOverGameObject(touch.fingerId)
+				) {
+					return;
+				}
+
+				ToggleDirection();
+				return;
+			}
+		}
+
+		// MOUSE / EDITOR / PC
+		if (Input.GetMouseButtonDown(0)) {
+			if (
+				EventSystem.current != null &&
+				EventSystem.current.IsPointerOverGameObject()
+			) {
+				return;
+			}
+
+			ToggleDirection();
+			return;
+		}
+
+		// TECLADO / TESTE NO EDITOR
+		if (
 			Input.GetKeyDown(KeyCode.Space) ||
 			Input.GetKeyDown(KeyCode.A) ||
 			Input.GetKeyDown(KeyCode.D) ||
 			Input.GetKeyDown(KeyCode.LeftArrow) ||
-			Input.GetKeyDown(KeyCode.RightArrow)) {
-
+			Input.GetKeyDown(KeyCode.RightArrow)
+		) {
 			ToggleDirection();
 		}
 	}
@@ -196,12 +231,12 @@ public class BallScript : MonoBehaviour
 		//SnapToGridAfterTurn();
 
 		//Toca o efeito visual de impacto ao virar
-		PlayTurnImpact();
+		//PlayTurnImpact();
 	}
 
 	private void MoveBall()
 	{
-		transform.position += currentDirection * currentSpeed * Time.fixedDeltaTime;
+		transform.position += currentDirection * currentSpeed * Time.deltaTime;
 	}
 
 	private void RotateVisual()
@@ -209,7 +244,7 @@ public class BallScript : MonoBehaviour
 		if (visualToRotate == null)
 			return;
 
-		visualToRotate.Rotate(Vector3.right * visualRotationSpeed * Time.fixedDeltaTime, Space.Self);
+		visualToRotate.Rotate(Vector3.right * visualRotationSpeed * Time.deltaTime, Space.Self);
 	}
 
 	//Dispara o efeito visual de impacto ao virar
@@ -295,6 +330,12 @@ public class BallScript : MonoBehaviour
 		targetEmissionColor = originalEmissionColor;
 
 		ApplyEmissionColor(currentEmissionColor);
+	}
+
+	public void RefreshBallMaterialAfterSkinChange()
+	{
+		SetupBallMaterial();
+		ApplyMagnetVisualState(magnetVisualActive, true);
 	}
 
 	private void HandleMagnetStateChanged(bool isActive)

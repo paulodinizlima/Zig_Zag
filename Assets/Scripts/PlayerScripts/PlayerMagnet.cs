@@ -44,6 +44,8 @@ public class PlayerMagnet : MonoBehaviour
 		if (wasInactive) {
 			MagnetStateChanged?.Invoke(true);
 		}
+
+		//Debug.Log("Magnet ativado. Timer real atual: " + timer + " segundos");
 	}
 
 	public void DeactivateMagnet()
@@ -57,5 +59,7 @@ public class PlayerMagnet : MonoBehaviour
 
 		//Dispara o evneto para HUD e feedback visual
 		MagnetStateChanged?.Invoke(false);
+
+		//Debug.Log("Magnet desativado");
 	}
 }

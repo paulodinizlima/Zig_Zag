@@ -168,7 +168,7 @@ public class TileScript : MonoBehaviour
 	{
 		yield return new WaitForSeconds(0.3f);
 		myBody.isKinematic = false;
-		audioSource.Play();
+		//audioSource.Play();
 		StartCoroutine(TurnOffGameObject());
 	}
 	IEnumerator TurnOffGameObject()

@@ -42,7 +42,7 @@ public class PlayerCurrency : MonoBehaviour
 		if (amount <= 0) {
 			return;
 		}
-		Debug.Log("Moeda Adicionada no Currency");
+		//Debug.Log("Moeda Adicionada no Currency");
 		silverCoins += amount;
 		
 		SaveCoins();
@@ -244,7 +244,7 @@ public class PlayerCurrency : MonoBehaviour
 			File.WriteAllText(SaveFilePath, json);
 		}
 		catch (System.Exception ex) {
-			Debug.Log("Failed to save coins to JSON: " + ex.Message);
+			//Debug.Log("Failed to save coins to JSON: " + ex.Message);
 		}
 	}
 
@@ -282,7 +282,7 @@ public class PlayerCurrency : MonoBehaviour
 			return true;
 		}
 		catch (System.Exception ex) {
-			Debug.LogWarning("Failed to load coins from JSON: " + ex.Message);
+			//Debug.LogWarning("Failed to load coins from JSON: " + ex.Message);
 			return false;
 		}
 	}

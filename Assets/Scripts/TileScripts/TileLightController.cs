@@ -2,7 +2,8 @@ using UnityEngine;
 
 public class TileLightController : MonoBehaviour
 {
-    [SerializeField] private Light pointLight;
+	[Header("Emissive Sphere")]
+	[SerializeField] private Renderer emissiveRenderer;
 
 	private void OnEnable()
 	{
@@ -16,19 +17,20 @@ public class TileLightController : MonoBehaviour
 
 	private void Awake()
 	{
-		if (pointLight == null) {
-			pointLight = GetComponentInChildren<Light>(true);
+		if (emissiveRenderer == null) {
+			emissiveRenderer = GetComponentInChildren<Renderer>(true);
 		}
 
-		if (pointLight != null) {
-			pointLight.enabled = false;
-		}
+		SetLightActive(false);
 	}
 
 	private void Start()
 	{
-		//Sincroniza o estado ao spawnar
-		bool shouldBeActive = PlayerTileEnergy.instance != null && PlayerTileEnergy.instance.IsTileEnergyActive;
+		// Sincroniza estado atual ao spawnar
+		bool shouldBeActive =
+			PlayerTileEnergy.instance != null &&
+			PlayerTileEnergy.instance.IsTileEnergyActive;
+
 		SetLightActive(shouldBeActive);
 	}
 
@@ -39,10 +41,10 @@ public class TileLightController : MonoBehaviour
 
 	private void SetLightActive(bool active)
 	{
-		if (pointLight == null) {
+		if (emissiveRenderer == null) {
 			return;
 		}
 
-		pointLight.enabled = active;
+		emissiveRenderer.enabled = active;
 	}
 }

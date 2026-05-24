@@ -36,36 +36,32 @@ public class Coin : MonoBehaviour
 
 	private void Start()
 	{
-		//Busca referências da bola e componentes ligados à coleta/magnet
 		GameObject ball = GameObject.FindGameObjectWithTag("Ball");
+
 		if (ball != null) {
 			ballTarget = ball.transform;
 			playerCurrency = ball.GetComponent<PlayerCurrency>();
 			playerMagnet = ball.GetComponent<PlayerMagnet>();
 		}
 
-		//Aplica o visual correto conforme o tipo da coin
 		ApplyVisualByType();
 	}
 
 	private void Update()
 	{
-		//Evita processamento desnecessário após coleta
 		if (collected) {
 			return;
 		}
 
-		//Apenas coins adjacentes usam a lógica de atração pelo magnet
+		// Apenas silver coins / AdjacentOnly são puxadas pelo magnet.
 		if (coinType != CoinType.AdjacentOnly) {
 			return;
 		}
 
-		//Se referências essenciais faltarem, não tenta puxar a coin
 		if (ballTarget == null || playerCurrency == null || playerMagnet == null) {
 			return;
 		}
 
-		//Sem magnet ativo, a coin não deve ser puxada
 		if (!playerMagnet.IsMagnetActive) {
 			isBeingPulled = false;
 			return;
@@ -73,7 +69,6 @@ public class Coin : MonoBehaviour
 
 		float distanceToBall = Vector3.Distance(transform.position, ballTarget.position);
 
-		//Passa a ser puxada quando entra no raio de atração
 		if (!isBeingPulled && distanceToBall <= playerMagnet.AttractionRadius) {
 			isBeingPulled = true;
 		}
@@ -82,22 +77,19 @@ public class Coin : MonoBehaviour
 			return;
 		}
 
-		//Vector3 targetPos = ballTarget.position + Vector3.up * 0.2f;
-
-		//Move a coin em direção à bola
 		transform.position = Vector3.MoveTowards(
 			transform.position,
 			ballTarget.position,
 			magnetMoveSpeed * Time.deltaTime
 		);
 
-		//Se chegou perto o suficiente, coleta
-		float updateDistance = Vector3.Distance(transform.position, ballTarget.position);
+		float updatedDistance = Vector3.Distance(transform.position, ballTarget.position);
 
-		if (updateDistance <= collectDistance) {
+		if (updatedDistance <= collectDistance) {
 			Collect(playerCurrency);
 		}
 	}
+
 	private void OnTriggerEnter(Collider other)
 	{
 		if (collected) {
@@ -108,17 +100,19 @@ public class Coin : MonoBehaviour
 			return;
 		}
 
-		//Busca o PlauyerCurrency a partir da bola
 		PlayerCurrency currency = other.GetComponent<PlayerCurrency>();
+
 		if (currency == null) {
 			currency = other.GetComponentInParent<PlayerCurrency>();
 		}
+
 		if (currency == null) {
+			//Debug.LogWarning("PlayerCurrency não encontrado na bola.");
 			return;
 		}
 
-		//Busca o magnet para validar coleta da coin adjacente
 		PlayerMagnet magnet = other.GetComponent<PlayerMagnet>();
+
 		if (magnet == null) {
 			magnet = other.GetComponentInParent<PlayerMagnet>();
 		}
@@ -132,13 +126,11 @@ public class Coin : MonoBehaviour
 
 	private bool CanCollectOnTouch(PlayerMagnet magnet)
 	{
-		//Coin normal sempre pode ser coletada no toque
 		if (coinType == CoinType.Normal) {
 			return true;
 		}
 
-		//Coin adjacente só pode ser coletada com magnet ativo
-		if(coinType == CoinType.AdjacentOnly) {
+		if (coinType == CoinType.AdjacentOnly) {
 			return magnet != null && magnet.IsMagnetActive;
 		}
 
@@ -147,30 +139,29 @@ public class Coin : MonoBehaviour
 
 	private void Collect(PlayerCurrency currency)
 	{
-		if (collected)
+		if (collected) {
 			return;
+		}
 
 		collected = true;
 
-		//IMPORTANTE
-		//A partir de agora a coin NÂO entra mais no saldo persistente no momento da coleta.
-		//O valor fica registrado apenas como estatística da run
-		//A persistência real será feita no fechamento da run (Win/lose)
-		//if (currency != null) {
-		//	currency.AddCoins(value);
-		//}
+		int finalValue = GetFinalCoinValue();
 
-		// Estatística separada da run
+		// Importante:
+		// Não salva direto no PlayerCurrency aqui.
+		// A coin entra na contagem da run pelo ScoreManager.
 		if (ScoreManager.instance != null) {
-			ScoreManager.instance.AddCoin(value, coinType);
+			ScoreManager.instance.AddCoin(finalValue, coinType);
 		}
 
-		//Som da coleta
+		if (GameplayController.instance != null) {
+			GameplayController.instance.PlayCollectableSound();
+		}
+
 		if (collectSound != null) {
 			AudioSource.PlayClipAtPoint(collectSound, transform.position, soundVolume);
 		}
 
-		//Efeito visual opcional
 		if (collectEffect != null) {
 			Instantiate(collectEffect, transform.position, Quaternion.identity);
 		}
@@ -178,23 +169,35 @@ public class Coin : MonoBehaviour
 		Destroy(gameObject);
 	}
 
+	private int GetFinalCoinValue()
+	{
+		// Gold/normal coin mantém o valor padrão.
+		if (coinType == CoinType.Normal) {
+			return value;
+		}
+
+		// Silver coin ganha valor especial se Enhanced Magnet foi desbloqueado.
+		if (coinType == CoinType.AdjacentOnly) {
+			if (UnlockData.instance != null && UnlockData.instance.EnhancedMagnetUnlocked) {
+				return UnlockData.instance.EnhancedSilverCoinValue;
+			}
+		}
+
+		return value;
+	}
+
 	private void ApplyVisualByType()
 	{
-		Renderer renderer = GetComponentInChildren<Renderer>();
+		Renderer renderer = GetComponent<Renderer>();
 
 		if (renderer == null) {
 			return;
 		}
 
-		//Define o material conforme o tipo da coin
-		if (coinType == CoinType.AdjacentOnly) {
-			if (adjacentMaterial != null) {
-				renderer.material = adjacentMaterial;
-			}
-		} else {
-			if (normalMaterial != null) {
-				renderer.material = normalMaterial;
-			}
+		if (coinType == CoinType.Normal && normalMaterial != null) {
+			renderer.material = normalMaterial;
+		} else if (coinType == CoinType.AdjacentOnly && adjacentMaterial != null) {
+			renderer.material = adjacentMaterial;
 		}
 	}
 }

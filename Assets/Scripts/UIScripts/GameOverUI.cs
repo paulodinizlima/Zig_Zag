@@ -23,10 +23,13 @@ public class GameOverUI : MonoBehaviour
 	[SerializeField] private TextMeshProUGUI bestScoreText;
 	[SerializeField] private TextMeshProUGUI finalLevelText;
 	[SerializeField] private TextMeshProUGUI finalGemsText;
+	// [ADDED] Texto para exibir o tempo jogado na run
+	[SerializeField] private TextMeshProUGUI timePlayedText;
 
 	[Header("Coin Result UI")]
 	[SerializeField] private TextMeshProUGUI finalGoldCoinsText;
 	[SerializeField] private TextMeshProUGUI finalSilverCoinsText;
+	[SerializeField] private TextMeshProUGUI totalCoinsFromRunText;
 	[SerializeField] private TextMeshProUGUI totalCoinsText;
 
 	[Header("Coin Transfer FX")]
@@ -47,21 +50,25 @@ public class GameOverUI : MonoBehaviour
 	[SerializeField] private float targetScalePunch = 1.08f;
 	[SerializeField] private float targetScalePunchDuration = 0.1f;
 
+	[Header("Total Coins Text Fade")]
+	[SerializeField] private float totalCoinsFadeDelay = 0.45f;
+	[SerializeField] private float totalCoinsFadeDuration = 0.6f;
+
+	[Header("Gem Loss Visual")]
+	[SerializeField] private float gemLossStartDelay = 0.25f;
+	[SerializeField] private float gemLossDuration = 0.9f;
+	[SerializeField] private Color gemLossColor = new Color(1f, 0.15f, 0.35f);
+
 	[Header("Coin FX Audio")]
 	[SerializeField] private AudioSource uiAudioSource;
 	[SerializeField] private AudioClip coinArriveSound;
 	[SerializeField] [Range(0f, 1f)] private float coinArriveVolume = 0.5f;
 
 	[Header("Final Target Spark FX")]
-	//Prefab UI opcional para um brilho/spark no alvo final
 	[SerializeField] private RectTransform finalTargetSparkPrefab;
-	//Parent opcional do spark; se vazio, usa flyingCoinsParent
 	[SerializeField] private RectTransform finalTargetSparkParent;
-	//Duração do spark
 	[SerializeField] private float finalTargetSparkLifetime = 0.35f;
-	//Escala máxima do spark
 	[SerializeField] private float finalTargetSparkScale = 1.35f;
-	//Flash de cor no texto do total quando a última coin chega
 	[SerializeField] private Color totalCoinsHighlightColor = new Color(1f, 0.92f, 0.35f);
 
 	private Vector2 contentStartPos;
@@ -70,11 +77,14 @@ public class GameOverUI : MonoBehaviour
 
 	private Vector3 totalCoinsTextOriginalScale;
 	private Color totalCoinsTextOriginalColor;
+	private Color finalGemsTextOriginalColor;
+
 	private Coroutine totalCoinsPunchRoutine;
 	private Coroutine totalCoinsFlashRoutine;
+	private Coroutine totalCoinsFadeRoutine;
 
-	// Controle do valor visível durante a animação
 	private int displayedTotalCoins = 0;
+	private int displayedRunGems = 0;
 
 	private void Awake()
 	{
@@ -82,6 +92,7 @@ public class GameOverUI : MonoBehaviour
 			Destroy(gameObject);
 			return;
 		}
+
 		instance = this;
 	}
 
@@ -107,6 +118,10 @@ public class GameOverUI : MonoBehaviour
 			totalCoinsTextOriginalColor = totalCoinsText.color;
 		}
 
+		if (finalGemsText != null) {
+			finalGemsTextOriginalColor = finalGemsText.color;
+		}
+
 		if (uiAudioSource == null) {
 			uiAudioSource = GetComponent<AudioSource>();
 		}
@@ -116,24 +131,55 @@ public class GameOverUI : MonoBehaviour
 
 	public void ShowGameOver(int finalScore, int bestScore, int finalLevel, int finalGems)
 	{
+		if (GameplayController.instance != null) {
+			GameplayController.instance.HideGameplayHUD();
+		}
+
+		if (SharedCurrencyBarUI.instance != null) {
+			SharedCurrencyBarUI.instance.Hide();
+		}
+
 		if (gameOverPanel != null) {
 			gameOverPanel.SetActive(true);
 		}
 
+		runRewardsCommitted = false;
+		displayedRunGems = finalGems;
+
 		if (finalScoreText != null) {
-			finalScoreText.text = "Score: " + finalScore;
+			finalScoreText.text = "" + finalScore;
 		}
 
 		if (bestScoreText != null) {
-			bestScoreText.text = "Best: " + bestScore;
+			bestScoreText.text = "" + bestScore;
 		}
 
 		if (finalLevelText != null) {
-			finalLevelText.text = "Level: " + finalLevel;
+			finalLevelText.text = "" + finalLevel;
 		}
 
 		if (finalGemsText != null) {
-			finalGemsText.text = "Gems: " + finalGems;
+			finalGemsText.color = finalGemsTextOriginalColor;
+			finalGemsText.text = "" + finalGems;
+		}
+
+		// [ADDED] Lê o RunTime diretamente do GameplayController, sem alterar ScoreManager
+		if (timePlayedText != null) {
+			float runTime = 0f;
+
+			if (GameplayController.instance != null) {
+				runTime = GameplayController.instance.RunTime;
+			}
+
+			timePlayedText.text = FormatTime(runTime);
+		}
+
+		if (GameMusicManager.instance != null) {
+			GameMusicManager.instance.PlayMenuMusic();
+		}
+
+		if (SupportPromptManager.instance != null) {
+			SupportPromptManager.instance.RegisterGameOver();
 		}
 
 		StopAllCoroutines();
@@ -148,6 +194,7 @@ public class GameOverUI : MonoBehaviour
 
 		if (coinTransferStartDelay > 0f) {
 			float delay = 0f;
+
 			while (delay < coinTransferStartDelay) {
 				delay += Time.unscaledDeltaTime;
 				yield return null;
@@ -155,6 +202,10 @@ public class GameOverUI : MonoBehaviour
 		}
 
 		yield return StartCoroutine(PlayCoinTransferAndCommitOnLose());
+
+		yield return StartCoroutine(PlayGemLossVisualIfNeeded());
+
+		StartFadeTotalCoinsText();
 
 		if (canvasGroup != null) {
 			canvasGroup.interactable = true;
@@ -169,13 +220,17 @@ public class GameOverUI : MonoBehaviour
 		}
 
 		if (ScoreManager.instance == null) {
-			Debug.LogWarning("ScoreManager.instance não encontrado ao tentar consolidar recompensas da run.");
+			//Debug.LogWarning("ScoreManager.instance não encontrado ao tentar consolidar recompensas da run.");
 			yield break;
 		}
 
 		int goldCoinsFromRun = ScoreManager.instance.GoldCoinsCollected;
 		int silverCoinsFromRun = ScoreManager.instance.SilverCoinsCollected;
 		int totalCoinsFromRun = goldCoinsFromRun + silverCoinsFromRun;
+
+		if (totalCoinsFromRunText != null) {
+			totalCoinsFromRunText.text = "" + totalCoinsFromRun;
+		}
 
 		if (finalGoldCoinsText != null) {
 			finalGoldCoinsText.text = "Gold: " + goldCoinsFromRun;
@@ -186,8 +241,9 @@ public class GameOverUI : MonoBehaviour
 		}
 
 		PlayerCurrency playerCurrency = PlayerCurrency.instance;
+
 		if (playerCurrency == null) {
-			Debug.LogWarning("PlayerCurrency.instance não encontrado ao tentar consolidar recompensas da run.");
+			//Debug.LogWarning("PlayerCurrency.instance não encontrado ao tentar consolidar recompensas da run.");
 			yield break;
 		}
 
@@ -199,7 +255,10 @@ public class GameOverUI : MonoBehaviour
 		if (totalCoinsText != null) {
 			totalCoinsText.text = "Total Coins: " + displayedTotalCoins;
 			totalCoinsText.rectTransform.localScale = totalCoinsTextOriginalScale;
-			totalCoinsText.color = totalCoinsTextOriginalColor;
+
+			Color visibleColor = totalCoinsTextOriginalColor;
+			visibleColor.a = 1f;
+			totalCoinsText.color = visibleColor;
 		}
 
 		if (totalCoinsFromRun <= 0) {
@@ -216,12 +275,10 @@ public class GameOverUI : MonoBehaviour
 		if (hasCoinFxSetup) {
 			yield return StartCoroutine(AnimateFlyingCoinsParallel(totalCoinsFromRun));
 		} else {
-			// Fallback: se não houver FX visual configurado, incrementa tudo de uma vez
 			AddToDisplayedTotal(totalCoinsFromRun);
 			TriggerFinalTargetSpark();
 		}
 
-		// Garante o valor final correto
 		if (displayedTotalCoins != finalTotalCoins) {
 			displayedTotalCoins = finalTotalCoins;
 
@@ -241,11 +298,48 @@ public class GameOverUI : MonoBehaviour
 		runRewardsCommitted = true;
 	}
 
+	private IEnumerator PlayGemLossVisualIfNeeded()
+	{
+		if (finalGemsText == null) {
+			yield break;
+		}
+
+		if (displayedRunGems <= 0) {
+			finalGemsText.text = "0";
+			yield break;
+		}
+
+		float delayTimer = 0f;
+
+		while (delayTimer < gemLossStartDelay) {
+			delayTimer += Time.unscaledDeltaTime;
+			yield return null;
+		}
+
+		int startGems = displayedRunGems;
+		float timer = 0f;
+
+		finalGemsText.color = gemLossColor;
+
+		while (timer < gemLossDuration) {
+			timer += Time.unscaledDeltaTime;
+			float t = Mathf.Clamp01(timer / gemLossDuration);
+
+			int currentValue = Mathf.RoundToInt(Mathf.Lerp(startGems, 0, t));
+			currentValue = Mathf.Clamp(currentValue, 0, startGems);
+
+			finalGemsText.text = "" + currentValue;
+
+			yield return null;
+		}
+
+		displayedRunGems = 0;
+		finalGemsText.text = "0";
+	}
+
 	private IEnumerator AnimateFlyingCoinsParallel(int totalCoinsFromRun)
 	{
 		int flyingCoinsCount = Mathf.Clamp(totalCoinsFromRun, 1, maxFlyingCoinIcons);
-
-		// Distribui o valor real entre as coins visuais
 		List<int> incrementsPerCoin = BuildCoinIncrementDistribution(totalCoinsFromRun, flyingCoinsCount);
 
 		for (int i = 0; i < flyingCoinsCount; i++) {
@@ -259,6 +353,7 @@ public class GameOverUI : MonoBehaviour
 
 			if (coinSpawnInterval > 0f) {
 				float spawnDelay = 0f;
+
 				while (spawnDelay < coinSpawnInterval) {
 					spawnDelay += Time.unscaledDeltaTime;
 					yield return null;
@@ -285,12 +380,10 @@ public class GameOverUI : MonoBehaviour
 		for (int i = 0; i < flyingCoinsCount; i++) {
 			int value = baseValue;
 
-			// Distribui o resto nas primeiras coins
 			if (i < remainder) {
 				value += 1;
 			}
 
-			// Segurança para nunca gerar coin visual sem valor
 			if (value <= 0) {
 				value = 1;
 			}
@@ -338,7 +431,6 @@ public class GameOverUI : MonoBehaviour
 
 		coinFx.anchoredPosition = endPos;
 
-		// Quando a coin chega, incrementa o total visível junto com o efeito
 		AddToDisplayedTotal(incrementValue);
 		PlayCoinArriveSound();
 		PunchTotalCoinsText();
@@ -397,6 +489,7 @@ public class GameOverUI : MonoBehaviour
 		while (timer < halfDuration) {
 			timer += Time.unscaledDeltaTime;
 			float t = Mathf.Clamp01(timer / halfDuration);
+
 			target.localScale = Vector3.Lerp(startScale, punchScale, t);
 			yield return null;
 		}
@@ -406,6 +499,7 @@ public class GameOverUI : MonoBehaviour
 		while (timer < halfDuration) {
 			timer += Time.unscaledDeltaTime;
 			float t = Mathf.Clamp01(timer / halfDuration);
+
 			target.localScale = Vector3.Lerp(punchScale, startScale, t);
 			yield return null;
 		}
@@ -416,19 +510,18 @@ public class GameOverUI : MonoBehaviour
 
 	private void TriggerFinalTargetSpark()
 	{
-		//Sempre faz pelo menos o flash no texto
 		if (totalCoinsFlashRoutine != null) {
 			StopCoroutine(totalCoinsFlashRoutine);
 		}
 
 		totalCoinsFlashRoutine = StartCoroutine(FlashTotalCoinsTextRoutine());
 
-		//Se houver prefab de spark configurado, instancia no alvo final
 		if (finalTargetSparkPrefab == null || totalCoinsTargetAnchor == null) {
 			return;
 		}
 
 		RectTransform sparkParent = finalTargetSparkParent != null ? finalTargetSparkParent : flyingCoinsParent;
+
 		if (sparkParent == null) {
 			return;
 		}
@@ -445,8 +538,8 @@ public class GameOverUI : MonoBehaviour
 		Vector3 startScale = Vector3.zero;
 		Vector3 endScale = Vector3.one * finalTargetSparkScale;
 
-		// Tenta usar CanvasGroup para fade; se não houver, adiciona
 		CanvasGroup sparkCanvasGroup = sparkFx.GetComponent<CanvasGroup>();
+
 		if (sparkCanvasGroup == null) {
 			sparkCanvasGroup = sparkFx.gameObject.AddComponent<CanvasGroup>();
 		}
@@ -460,10 +553,8 @@ public class GameOverUI : MonoBehaviour
 			timer += Time.unscaledDeltaTime;
 			float t = Mathf.Clamp01(timer / finalTargetSparkLifetime);
 
-			// Cresce rápido e some suavemente
 			float scaleT = Mathf.SmoothStep(0f, 1f, t);
 			sparkFx.localScale = Vector3.Lerp(startScale, endScale, scaleT);
-
 			sparkCanvasGroup.alpha = Mathf.Lerp(1f, 0f, t);
 
 			yield return null;
@@ -485,15 +576,70 @@ public class GameOverUI : MonoBehaviour
 			timer += Time.unscaledDeltaTime;
 			float t = Mathf.Clamp01(timer / duration);
 
-			// Vai para a cor highlight e volta
 			float pingPong = Mathf.Sin(t * Mathf.PI);
 			totalCoinsText.color = Color.Lerp(totalCoinsTextOriginalColor, totalCoinsHighlightColor, pingPong);
 
 			yield return null;
 		}
 
-		totalCoinsText.color = totalCoinsTextOriginalColor;
+		if (totalCoinsFadeRoutine == null) {
+			totalCoinsText.color = totalCoinsTextOriginalColor;
+		}
+
 		totalCoinsFlashRoutine = null;
+	}
+
+	private void StartFadeTotalCoinsText()
+	{
+		if (totalCoinsText == null) {
+			return;
+		}
+
+		if (totalCoinsFadeRoutine != null) {
+			StopCoroutine(totalCoinsFadeRoutine);
+		}
+
+		totalCoinsFadeRoutine = StartCoroutine(FadeTotalCoinsTextRoutine());
+	}
+
+	private IEnumerator FadeTotalCoinsTextRoutine()
+	{
+		if (totalCoinsText == null) {
+			yield break;
+		}
+
+		float safeDelay = totalCoinsFadeDelay + finalTargetSparkLifetime + 0.15f;
+		float delayTimer = 0f;
+
+		while (delayTimer < safeDelay) {
+			delayTimer += Time.unscaledDeltaTime;
+			yield return null;
+		}
+
+		if (totalCoinsFlashRoutine != null) {
+			StopCoroutine(totalCoinsFlashRoutine);
+			totalCoinsFlashRoutine = null;
+		}
+
+		Color startColor = totalCoinsText.color;
+		startColor.a = 1f;
+
+		Color endColor = startColor;
+		endColor.a = 0f;
+
+		float timer = 0f;
+
+		while (timer < totalCoinsFadeDuration) {
+			timer += Time.unscaledDeltaTime;
+			float t = Mathf.Clamp01(timer / totalCoinsFadeDuration);
+
+			totalCoinsText.color = Color.Lerp(startColor, endColor, t);
+
+			yield return null;
+		}
+
+		totalCoinsText.color = endColor;
+		totalCoinsFadeRoutine = null;
 	}
 
 	private IEnumerator AnimateGameOver()
@@ -537,7 +683,22 @@ public class GameOverUI : MonoBehaviour
 		}
 	}
 
+	// [ADDED] Formata segundos em MM:SS
+	private string FormatTime(float time)
+	{
+		int minutes = Mathf.FloorToInt(time / 60f);
+		int seconds = Mathf.FloorToInt(time % 60f);
+
+		return $"{minutes:00}:{seconds:00}";
+	}
+
 	public void RestartGame()
+	{
+		Time.timeScale = 1f;
+		SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+	}
+
+	public void GoHome()
 	{
 		Time.timeScale = 1f;
 		SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
